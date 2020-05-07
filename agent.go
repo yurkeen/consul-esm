@@ -54,11 +54,9 @@ func NewAgent(config *Config, logger *log.Logger) (*Agent, error) {
 		return nil, err
 	}
 
-	// Generate a unique ID for this agent so we can disambiguate different
-	// instances on the same host.
-	id := config.id
-	if id == "" {
-		id, err = uuid.GenerateUUID()
+	// if no ID is configured, generate a unique ID for this agent
+	if config.InstanceID == "" {
+		config.InstanceID, err = uuid.GenerateUUID()
 		if err != nil {
 			return nil, err
 		}
@@ -67,7 +65,7 @@ func NewAgent(config *Config, logger *log.Logger) (*Agent, error) {
 	agent := Agent{
 		config:        config,
 		client:        client,
-		id:            id,
+		id:            config.InstanceID,
 		logger:        logger,
 		shutdownCh:    make(chan struct{}),
 		inflightPings: make(map[string]struct{}),
@@ -143,6 +141,11 @@ func (a *Agent) serviceID() string {
 
 // register is used to register this agent with Consul service discovery.
 func (a *Agent) register() error {
+	// agent ids need to be unique to disambiguate different instances on same host
+	if existing, _, _ := a.client.Agent().Service(a.serviceID(), nil); existing != nil {
+		return fmt.Errorf("An ESM instance with id %s is already registered with Consul", a.id)
+	}
+
 	service := &api.AgentServiceRegistration{
 		ID:   a.serviceID(),
 		Name: a.config.Service,

@@ -29,6 +29,7 @@ type Config struct {
 	Tag     string
 	KVPath  string
 
+	InstanceID               string
 	NodeMeta                 map[string]string
 	Interval                 time.Duration
 	DeregisterAfter          time.Duration
@@ -46,9 +47,6 @@ type Config struct {
 	TLSServerName string
 
 	PingType string
-
-	// Test-only fields.
-	id string
 }
 
 func (c *Config) ClientConfig() *api.Config {
@@ -99,15 +97,17 @@ func DefaultConfig() *Config {
 	}
 }
 
+// HumanConfig contains configuration that the practitioner can set
 type HumanConfig struct {
 	LogLevel       flags.StringValue `mapstructure:"log_level"`
 	EnableSyslog   flags.BoolValue   `mapstructure:"enable_syslog"`
 	SyslogFacility flags.StringValue `mapstructure:"syslog_facility"`
 
-	Service  flags.StringValue   `mapstructure:"consul_service"`
-	Tag      flags.StringValue   `mapstructure:"consul_service_tag"`
-	KVPath   flags.StringValue   `mapstructure:"consul_kv_path"`
-	NodeMeta []map[string]string `mapstructure:"external_node_meta"`
+	InstanceID flags.StringValue   `mapstructure:"instance_id"`
+	Service    flags.StringValue   `mapstructure:"consul_service"`
+	Tag        flags.StringValue   `mapstructure:"consul_service_tag"`
+	KVPath     flags.StringValue   `mapstructure:"consul_kv_path"`
+	NodeMeta   []map[string]string `mapstructure:"external_node_meta"`
 
 	NodeReconnectTimeout flags.DurationValue `mapstructure:"node_reconnect_timeout"`
 	NodeProbeInterval    flags.DurationValue `mapstructure:"node_probe_interval"`
@@ -124,6 +124,8 @@ type HumanConfig struct {
 	PingType flags.StringValue `mapstructure:"ping_type"`
 }
 
+// DecodeConfig takes a reader containing config file and returns
+// configuration struct
 func DecodeConfig(r io.Reader) (*HumanConfig, error) {
 	// Parse the file (could be HCL or JSON)
 	bytes, err := ioutil.ReadAll(r)
@@ -246,8 +248,11 @@ func MergeConfigPaths(dst *Config, paths []string) error {
 	return nil
 }
 
+// MergeConfig merges the default config with any configuration
+// set by the practitioner
 func MergeConfig(dst *Config, src *HumanConfig) {
 	src.LogLevel.Merge(&dst.LogLevel)
+	src.InstanceID.Merge(&dst.InstanceID)
 	src.Service.Merge(&dst.Service)
 	src.Tag.Merge(&dst.Tag)
 	src.KVPath.Merge(&dst.KVPath)
