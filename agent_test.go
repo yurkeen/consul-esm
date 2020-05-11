@@ -127,3 +127,112 @@ func TestAgent_registerServiceAndCheck(t *testing.T) {
 	// Make sure the service and check are gone
 	retry.Run(t, ensureDeregistered)
 }
+
+func TestAgent_uniqueInstanceID(t *testing.T) {
+	t.Parallel()
+
+	s, err := NewTestServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Stop()
+
+	// Register first ESM instance
+	agent1 := testAgent(t, func(c *Config) {
+		c.HTTPAddr = s.HTTPAddr
+		c.InstanceID = "unique-instance-id-1"
+	})
+	defer agent1.Shutdown()
+
+	// Make sure the first ESM service is registered
+	retry.Run(t, func(r *retry.R) {
+		services, _, err := agent1.client.Catalog().Service(agent1.config.Service, "", nil)
+		if err != nil {
+			r.Fatal(err)
+		}
+		if len(services) != 1 {
+			r.Fatalf("1 service should be registered: %v", services)
+		}
+		if got, want := services[0].ServiceID, agent1.serviceID(); got != want {
+			r.Fatalf("got service id %q, want %q", got, want)
+		}
+	})
+
+	// Register second ESM instance
+	agent2 := testAgent(t, func(c *Config) {
+		c.HTTPAddr = s.HTTPAddr
+		c.InstanceID = "unique-instance-id-2"
+	})
+	defer agent2.Shutdown()
+
+	// Make sure second ESM service is registered
+	retry.Run(t, func(r *retry.R) {
+		services, _, err := agent2.client.Catalog().Service(agent2.config.Service, "", nil)
+		if err != nil {
+			r.Fatal(err)
+		}
+		if len(services) != 2 {
+			r.Fatalf("2 service should be registered, got: %v", services)
+		}
+		if got, want := services[1].ServiceID, agent2.serviceID(); got != want {
+			r.Fatalf("got service id %q, want %q", got, want)
+		}
+	})
+}
+
+func TestAgent_notUniqueInstanceIDFails(t *testing.T) {
+	t.Parallel()
+	notUniqueInstanceID := "not-unique-instance-id"
+
+	s, err := NewTestServer()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Stop()
+
+	// Register first ESM instance
+	agent := testAgent(t, func(c *Config) {
+		c.HTTPAddr = s.HTTPAddr
+		c.InstanceID = notUniqueInstanceID
+	})
+	defer agent.Shutdown()
+
+	// Make sure the ESM service is registered
+	ensureRegistered := func(r *retry.R) {
+		services, _, err := agent.client.Catalog().Service(agent.config.Service, "", nil)
+		if err != nil {
+			r.Fatal(err)
+		}
+		if len(services) != 1 {
+			r.Fatalf("1 service should be registered: %v", services)
+		}
+		if got, want := services[0].ServiceID, agent.serviceID(); got != want {
+			r.Fatalf("got service id %q, want %q", got, want)
+		}
+	}
+	retry.Run(t, ensureRegistered)
+
+	// Create second ESM service with same instance ID
+	logger := log.New(LOGOUT, "", log.LstdFlags)
+	conf := DefaultConfig()
+	conf.InstanceID = notUniqueInstanceID
+	conf.HTTPAddr = s.HTTPAddr
+
+	duplicateAgent, err := NewAgent(conf, logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = duplicateAgent.Run()
+	defer duplicateAgent.Shutdown()
+
+	if err == nil {
+		t.Fatal("Failed to error when registering ESM service with same instance ID")
+	}
+
+	switch e := err.(type) {
+	case *alreadyExistsError:
+	default:
+		t.Fatalf("Unexpected error type. Wanted an alreadyExistsError type. Error: '%v'", e)
+	}
+}

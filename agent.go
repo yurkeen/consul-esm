@@ -139,11 +139,19 @@ func (a *Agent) serviceID() string {
 	return fmt.Sprintf("%s:%s", a.config.Service, a.id)
 }
 
+type alreadyExistsError struct {
+	serviceID string
+}
+
+func (e *alreadyExistsError) Error() string {
+	return fmt.Sprintf("ESM instance with service id '%s' is already registered with Consul", e.serviceID)
+}
+
 // register is used to register this agent with Consul service discovery.
 func (a *Agent) register() error {
 	// agent ids need to be unique to disambiguate different instances on same host
 	if existing, _, _ := a.client.Agent().Service(a.serviceID(), nil); existing != nil {
-		return fmt.Errorf("An ESM instance with service id '%s' is already registered with Consul", a.serviceID())
+		return &alreadyExistsError{a.serviceID()}
 	}
 
 	service := &api.AgentServiceRegistration{
