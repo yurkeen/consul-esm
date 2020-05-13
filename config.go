@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/command/flags"
+	"github.com/hashicorp/go-uuid"
 	"github.com/hashicorp/hcl"
 	"github.com/hashicorp/hcl/hcl/ast"
 	"github.com/mitchellh/mapstructure"
@@ -80,11 +81,19 @@ func (c *Config) ClientConfig() *api.Config {
 	return conf
 }
 
-func DefaultConfig() *Config {
+// DefaultConfig generates esm config with default values
+func DefaultConfig() (*Config, error) {
+	// if no ID is configured, generate a unique ID for this agent
+	instanceID, err := uuid.GenerateUUID()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
-		LogLevel: "INFO",
-		Service:  "consul-esm",
-		KVPath:   "consul-esm/",
+		InstanceID: instanceID,
+		LogLevel:   "INFO",
+		Service:    "consul-esm",
+		KVPath:     "consul-esm/",
 		NodeMeta: map[string]string{
 			"external-node": "true",
 		},
@@ -94,7 +103,7 @@ func DefaultConfig() *Config {
 		CoordinateUpdateInterval: 10 * time.Second,
 		NodeReconnectTimeout:     72 * time.Hour,
 		PingType:                 PingTypeUDP,
-	}
+	}, nil
 }
 
 // HumanConfig contains configuration that the practitioner can set
@@ -173,7 +182,10 @@ func DecodeConfig(r io.Reader) (*HumanConfig, error) {
 // BuildConfig builds a new Config object from the default configuration
 // and the list of config files given and returns it after validation.
 func BuildConfig(configFiles []string) (*Config, error) {
-	config := DefaultConfig()
+	config, err := DefaultConfig()
+	if err != nil {
+		return nil, err
+	}
 	if err := MergeConfigPaths(config, configFiles); err != nil {
 		return nil, fmt.Errorf("Error loading config: %v", err)
 	}

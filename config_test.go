@@ -88,7 +88,11 @@ func TestValidateConfig(t *testing.T) {
 	for _, tc := range cases {
 		buf := bytes.NewBufferString(tc.raw)
 
-		result := DefaultConfig()
+		result, err := DefaultConfig()
+		if err != nil {
+			t.Fatal(err)
+		}
+
 		humanConfig, err := DecodeConfig(buf)
 		if err != nil {
 			t.Fatal(err)

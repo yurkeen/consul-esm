@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/go-uuid"
 )
 
 const LeaderKey = "leader"
@@ -52,14 +51,6 @@ func NewAgent(config *Config, logger *log.Logger) (*Agent, error) {
 	client, err := api.NewClient(clientConf)
 	if err != nil {
 		return nil, err
-	}
-
-	// if no ID is configured, generate a unique ID for this agent
-	if config.InstanceID == "" {
-		config.InstanceID, err = uuid.GenerateUUID()
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	agent := Agent{

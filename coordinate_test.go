@@ -163,9 +163,14 @@ func TestCoordinate_reapFailedNode(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	conf, err := DefaultConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	agent := &Agent{
 		client: client,
-		config: DefaultConfig(),
+		config: conf,
 		logger: log.New(LOGOUT, "", log.LstdFlags),
 	}
 	agent.config.NodeReconnectTimeout = 200 * time.Millisecond

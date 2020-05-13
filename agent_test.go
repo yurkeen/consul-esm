@@ -12,7 +12,10 @@ import (
 
 func testAgent(t *testing.T, cb func(*Config)) *Agent {
 	logger := log.New(LOGOUT, "", log.LstdFlags)
-	conf := DefaultConfig()
+	conf, err := DefaultConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
 	conf.CoordinateUpdateInterval = 200 * time.Millisecond
 	if cb != nil {
 		cb(conf)
@@ -214,7 +217,10 @@ func TestAgent_notUniqueInstanceIDFails(t *testing.T) {
 
 	// Create second ESM service with same instance ID
 	logger := log.New(LOGOUT, "", log.LstdFlags)
-	conf := DefaultConfig()
+	conf, err := DefaultConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
 	conf.InstanceID = notUniqueInstanceID
 	conf.HTTPAddr = s.HTTPAddr
 
